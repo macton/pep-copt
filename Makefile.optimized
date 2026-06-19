@@ -1,0 +1,64 @@
+# Makefile.optimized — optimized PEP harness build targets.
+# Separate from the reference Makefile; changes NO existing reference target.
+# Same flags as the reference so the speedup ratio is honest (both get the same
+# compiler optimization). Builds into build/ under DISTINCT names.
+#
+#   make -f Makefile.optimized optimized
+CC      := gcc
+CFLAGS  := -std=c11 -Wall -Wextra -Werror -O3 -march=native -DNDEBUG
+PEPFLAG := -Wno-unknown-pragmas
+LDLIBS  := -lm
+B       := build
+
+# Optimized include order: src-optimized first (so pep.h resolves to the
+# optimized copy), then src (for the shared pep_codec.h), then root (stb).
+INC_OPT := -Isrc-optimized -Isrc -I.
+
+.PHONY: optimized clean-optimized
+optimized: $(B)/test_runner_opt $(B)/perf_harness_opt \
+           $(B)/compare_results $(B)/gen_images_seed \
+           $(B)/decomp_time $(B)/decomp_time_opt
+
+$(B):
+	mkdir -p $(B)
+
+# optimized PEP compressor (single TU instantiating src-optimized/pep.h)
+$(B)/pep_opt.o: src-optimized/pep.c src-optimized/pep.h | $(B)
+	$(CC) $(CFLAGS) $(PEPFLAG) $(INC_OPT) -c src-optimized/pep.c -o $@
+
+# shared pre-processing library, reused as-is from the reference build.
+$(B)/pepc.o: src/pep_codec.c src/pep_codec.h | $(B)
+	$(CC) $(CFLAGS) -Isrc -I. -c src/pep_codec.c -o $@
+
+# optimized timing harness — same source as the reference harness, compiled
+# with INC_OPT so #include "pep.h" resolves to the optimized copy.
+$(B)/perf_harness_opt: performance-test/perf_main.c $(B)/pep_opt.o $(B)/pepc.o
+	$(CC) $(CFLAGS) $(PEPFLAG) $(INC_OPT) performance-test/perf_main.c \
+	    $(B)/pep_opt.o $(B)/pepc.o -o $@ $(LDLIBS)
+
+# full reference correctness suite against the optimized library
+$(B)/test_runner_opt: test/test_main.c $(B)/pep_opt.o $(B)/pepc.o
+	$(CC) $(CFLAGS) $(PEPFLAG) $(INC_OPT) test/test_main.c \
+	    $(B)/pep_opt.o $(B)/pepc.o -o $@ $(LDLIBS)
+
+# byte-identity comparator (pure data transform)
+$(B)/compare_results: performance-test-optimized/compare_results.c | $(B)
+	$(CC) $(CFLAGS) -I. performance-test-optimized/compare_results.c -o $@ $(LDLIBS)
+
+# alternate-input generator for the generalization check (standalone, owns stb)
+$(B)/gen_images_seed: performance-test-optimized/gen_images_seed.c | $(B)
+	$(CC) $(CFLAGS) -I. performance-test-optimized/gen_images_seed.c -o $@ $(LDLIBS)
+
+# decompression-time tools: each links its OWN compressor library, so the
+# reference build decompresses reference .pep and the optimized build
+# decompresses optimized .pep. Times pep_decompress only (file load excluded).
+$(B)/decomp_time: performance-test-optimized/decomp_time.c src/pep.c src/pep.h | $(B)
+	$(CC) $(CFLAGS) $(PEPFLAG) -Isrc -I. performance-test-optimized/decomp_time.c src/pep.c -o $@ $(LDLIBS)
+
+$(B)/decomp_time_opt: performance-test-optimized/decomp_time.c src-optimized/pep.c src-optimized/pep.h | $(B)
+	$(CC) $(CFLAGS) $(PEPFLAG) $(INC_OPT) performance-test-optimized/decomp_time.c src-optimized/pep.c -o $@ $(LDLIBS)
+
+clean-optimized:
+	rm -f $(B)/pep_opt.o $(B)/perf_harness_opt $(B)/test_runner_opt \
+	      $(B)/compare_results $(B)/gen_images_seed \
+	      $(B)/decomp_time $(B)/decomp_time_opt

@@ -1,0 +1,29 @@
+#!/bin/sh
+# run-performance-test-optimized — build reference + optimized tools, quantize
+# the committed images (shared pre-processing, excluded from timing), run the
+# OPTIMIZED harness, and write performance-test-optimized/results.txt plus the
+# optimized .pep files under build/out-opt.
+#
+# Quantization is not under optimization, so both harnesses consume the same
+# build/q/*.qbin produced by `make input`. Only pep_compress differs.
+set -e
+cd "$(dirname "$0")"
+
+make -s all
+make -f Makefile.optimized -s optimized
+
+# build step: images/ -> build/q/*.qbin + build/images.list (excluded from timing)
+make -s input
+
+manifest_sum() { find images -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1; }
+before=$(manifest_sum)
+./build/perf_harness_opt build/images.list build/out-opt performance-test-optimized/results.txt
+after=$(manifest_sum)
+
+if [ "$before" != "$after" ]; then
+    echo "ERROR: committed images/ were modified by the run" >&2
+    exit 1
+fi
+echo "committed images checksum unchanged: $before"
+echo "results: performance-test-optimized/results.txt"
+echo "pep files: build/out-opt/"

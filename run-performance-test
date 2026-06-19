@@ -1,0 +1,28 @@
+#!/bin/sh
+# run-performance-test — build tools, quantize the committed images (build step,
+# excluded from timing), run the REFERENCE harness, and write
+# performance-test/results.txt plus the reference .pep files under build/out.
+#
+# The committed images in images/ are static and read-only; the quantized .qbin
+# files are derived build artifacts under build/. We verify via sha256 that the
+# run did not modify the committed images.
+set -e
+cd "$(dirname "$0")"
+
+make -s all
+
+# build step: images/ -> build/q/*.qbin + build/images.list (excluded from timing)
+make -s input
+
+manifest_sum() { find images -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1; }
+before=$(manifest_sum)
+./build/perf_harness build/images.list build/out performance-test/results.txt
+after=$(manifest_sum)
+
+if [ "$before" != "$after" ]; then
+    echo "ERROR: committed images/ were modified by the run" >&2
+    exit 1
+fi
+echo "committed images checksum unchanged: $before"
+echo "results: performance-test/results.txt"
+echo "pep files: build/out/"

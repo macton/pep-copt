@@ -53,3 +53,19 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# build artifacts (quantized inputs, .pep outputs, binaries, alt sets)
+/build/
+
+# harness outputs
+/performance-test/results.txt
+/performance-test-optimized/results.txt
+/performance-test-optimized/proof-run.log
+
+# standalone example outputs (written next to inputs)
+/images/*.pep
+/images/*.quantized.png
+/images/*.roundtrip.png
+
+# standalone example binary (build artifact; source pep_example.c is tracked)
+/pep_example
