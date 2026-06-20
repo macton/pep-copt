@@ -32,7 +32,7 @@ Two purposes:
 ## Methodology
 
 The work is driven by four instruction documents, one per phase, each fed to an
-LLM running under [nagent](https://github.com/macton/nagent) — an agent loop that
+LLM running under [nagent](https://github.com/macton/nagent) — an llm loop that
 runs a proof hook after every iteration so progress is measured, not recalled. The
 optimization phase, for example:
 
