@@ -29,7 +29,16 @@ Two purposes:
 2. **A reproducible case study of using an LLM to do the optimization** — what the
    human did, what the model did, and what the harness verified.
 
-## Methodology — four documents, four phases
+## Methodology
+
+The work is driven by four instruction documents, one per phase, each fed to an
+LLM running under [nagent](https://github.com/macton/nagent) — an agent loop that
+runs a proof hook after every iteration so progress is measured, not recalled. The
+optimization phase, for example:
+
+```sh
+cat prompts/create-optimized.md | nagent --hook-per-run ./prove-optimized-harness.sh -
+```
 
 1. [`prompts/create-reference.md`](prompts/create-reference.md) → the reference
    pipeline in [`src/`](src/): load (stb_image) → deterministic median-cut
